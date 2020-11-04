@@ -52,7 +52,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void onClick(View view) {
 
 //        String numero = "961162784";
-        String numero = "96116278";
+        String numero = "997248787";
         String mensaje = "Reloader System SMS Enviado en apagado";
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
@@ -61,11 +61,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     MY_PERMISSIONS_REQUEST_SEND_SMS);
         } else {
             SmsManager sms = SmsManager.getDefault();
-            ArrayList<String> mSMSMessageParts = sms.divideMessage("El dispositivo móvil basado en GSM se encarga de la segmentación en la que se rompen los mensajes a varias partes para enviar en ejecución");
+
+
+
+            ArrayList<String> parts  = sms.divideMessage("El dispositivo móvil basado en GSM se encarga de la segmentación en la que se rompen los mensajes a varias partes para enviar en ejecución y también el ensamblaje de los mensajes de varias partes en un mensaje en el recibo.");
 //            sms.sendTextMessage(numero, null, parts, sendPI, deliveredPI);
+            int numParts = parts.size();
 
+            ArrayList<PendingIntent> sentIntents = new ArrayList<PendingIntent>();
+            ArrayList<PendingIntent> deliveryIntents = new ArrayList<PendingIntent>();
 
-           // sms.sendMultipartTextMessage(numero, null, parts, sendPI, deliveredPI);
+            for (int i = 0; i < numParts; i++) {
+                sentIntents.add(sendPI);
+                deliveryIntents.add(deliveredPI);
+            }
+
+            sms.sendMultipartTextMessage(numero, null, parts , sentIntents, deliveryIntents);
         }
     }
 
