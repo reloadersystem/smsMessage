@@ -29,6 +29,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import okhttp3.ResponseBody;
 import pe.reloadersystem.msgenvio.Servicios.Retrofit.HelperWs;
+import pe.reloadersystem.msgenvio.Servicios.Retrofit.ItemPostsms;
 import pe.reloadersystem.msgenvio.Servicios.Retrofit.MethodWs;
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -54,10 +55,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     int count = 0;
     String cadena_respuesta;
+    int code;
 
     Handler handler = new Handler();
 
-    private final int TIEMPO = 10000;
+    private final int TIEMPO = 20000;
+
+    String resultEnvio;
 
 
     @Override
@@ -80,33 +84,37 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS},
                     MY_PERMISSIONS_REQUEST_SEND_SMS);
         } else {
+            revisarPendientes();
+        }
 
-            MethodWs methodWs = HelperWs.getConfiguration(this).create(MethodWs.class);
-            Call<ResponseBody> responseBodyCall = methodWs.getDatosSMS();
-            responseBodyCall.enqueue(new Callback<ResponseBody>() {
-                @Override
-                public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+    }
 
-                    if (response.isSuccessful()) {
-                        ResponseBody informacion = response.body();
-                        try {
-                            cadena_respuesta = informacion.string();
+    private void revisarPendientes() {
 
-                            SendMessage(cadena_respuesta);
+        MethodWs methodWs = HelperWs.getConfiguration(this).create(MethodWs.class);
+        Call<ResponseBody> responseBodyCall = methodWs.getDatosSMS();
+        responseBodyCall.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
 
+                if (response.isSuccessful()) {
+                    ResponseBody informacion = response.body();
+                    try {
+                        cadena_respuesta = informacion.string();
 
-                        } catch (Exception e) {
-                            Log.e("LogResponseError", e.toString());
-                        }
+                        SendMessage(cadena_respuesta);
+
+                    } catch (Exception e) {
+                        Log.e("LogResponseError", e.toString());
                     }
                 }
+            }
 
-                @Override
-                public void onFailure(Call<ResponseBody> call, Throwable t) {
-
-                }
-            });
-        }
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                Log.e("LogeError", t.toString());
+            }
+        });
     }
 
     private void SendMessage(String cadena_respuesta) {
@@ -115,11 +123,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             JSONObject respuesta = new JSONObject(cadena_respuesta);
             JSONArray data = respuesta.getJSONArray("data");
 
+            Boolean estado = Boolean.valueOf(respuesta.getString("status"));
+
+
             String datostosend = String.valueOf(data.length());
             Log.d("datostosend", datostosend);
 
             if (count < data.length()) {
-                int code = (int) ((JSONObject) data.get(count)).get("sms_id");
+                code = (int) ((JSONObject) data.get(count)).get("sms_id");
                 sms_destinatario = ((JSONObject) data.get(count)).getString("sms_destinatario");
                 sms_mensaje = ((JSONObject) data.get(count)).getString("sms_mensaje");
 
@@ -157,8 +168,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     deliveryIntents.add(deliveredPI);
                     sms.sendMultipartTextMessage(sms_destinatario, null, parts, sentIntents, deliveryIntents);
                 }
-
+            } else {
+                revisarPendientes();
             }
+
+
         } catch (Exception e) {
             Log.e("LogErrorJson", e.toString());
         }
@@ -188,7 +202,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         public void onReceive(Context context, Intent intent) {
 
-            String result = null;
+
+            String resultRecepcionado;
             String action = intent.getAction();
 
             String number = intent.getStringExtra(EXTRA_NUMBER);
@@ -203,10 +218,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     body.put(EXTRA_MESSAGE, message);
                     body.put(EXTRA_ID, sms_id);
                     body.put("resultCode", resultCode);
-                    result = translateSentResult(body);
-                    Toast.makeText(context, number + " - " + message + result, Toast.LENGTH_SHORT).show();
-
-                    ejecutarTarea();
+                    resultEnvio = translateSentResult(body);
+                    Toast.makeText(context, number + " - " + message + resultEnvio, Toast.LENGTH_SHORT).show();
 
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -223,10 +236,41 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     sms = SmsMessage.createFromPdu(pdu);
                 }
 
-                result = "Delivery result : " + translateDeliveryStatus(sms.getStatus());
+                resultRecepcionado = translateDeliveryStatus(sms.getStatus());
 
-                Toast.makeText(context, result, Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, resultRecepcionado, Toast.LENGTH_SHORT).show();
             }
+
+            ItemPostsms loguinRequest = new ItemPostsms(code, resultEnvio);
+
+            MethodWs methodWs = HelperWs.getConfiguration(getApplicationContext()).create(MethodWs.class);
+            Call<ResponseBody> responseBodyCall = methodWs.sendUpdateSMS(loguinRequest);
+            responseBodyCall.enqueue(new Callback<ResponseBody>() {
+                @Override
+                public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+
+                    if (response.isSuccessful()) {
+                        ResponseBody info = response.body();
+                        try {
+
+                            String cadena_respuesta = info.string();
+                            Log.e("LogResponse", cadena_respuesta);
+
+                            ejecutarTarea();
+
+                            //{"message":"Se actualizó el estado del registro.","status":true}
+
+                        } catch (Exception e) {
+                            Log.e("LogResponseError", cadena_respuesta);
+                        }
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<ResponseBody> call, Throwable t) {
+
+                }
+            });
         }
     }
 
@@ -237,7 +281,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         try {
             switch (params.getInt("resultCode")) {
                 case Activity.RESULT_OK:
-                    mensaje = "Activity.RESULT_OK";
+                    mensaje = "RESULT_OK";
                     break;
                 case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
                     mensaje = "SmsManager.RESULT_ERROR_GENERIC_FAILURE";
@@ -284,7 +328,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 count = count + 1;
                 SendMessage(cadena_respuesta);
-
                 handler.postDelayed(this, TIEMPO);
             }
 
