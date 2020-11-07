@@ -54,13 +54,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private IntentFilter intentFilter;
 
     int count = 0;
-    String cadena_respuesta;
+
     int code;
 
     Handler handler = new Handler();
 
-    private final int TIEMPO = 20000;
-
+    private final int TIEMPO = 10000;
     String resultEnvio;
 
 
@@ -100,10 +99,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (response.isSuccessful()) {
                     ResponseBody informacion = response.body();
                     try {
-                        cadena_respuesta = informacion.string();
-
-                        SendMessage(cadena_respuesta);
-
+                        String cadena_respuesta = informacion.string();
+                        JSONObject verifydata = new JSONObject(cadena_respuesta);
+                        Boolean estado = Boolean.valueOf(verifydata.getString("status"));
+                        if (estado) {
+                            SendMessage(cadena_respuesta);
+                        } else {
+                            Toast.makeText(MainActivity.this, "No hay pendientes", Toast.LENGTH_SHORT).show();
+                        }
                     } catch (Exception e) {
                         Log.e("LogResponseError", e.toString());
                     }
@@ -123,16 +126,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             JSONObject respuesta = new JSONObject(cadena_respuesta);
             JSONArray data = respuesta.getJSONArray("data");
 
-            Boolean estado = Boolean.valueOf(respuesta.getString("status"));
-
-
             String datostosend = String.valueOf(data.length());
             Log.d("datostosend", datostosend);
 
             if (count < data.length()) {
-                code = (int) ((JSONObject) data.get(count)).get("sms_id");
-                sms_destinatario = ((JSONObject) data.get(count)).getString("sms_destinatario");
-                sms_mensaje = ((JSONObject) data.get(count)).getString("sms_mensaje");
+                code = (int) ((JSONObject) data.get(0)).get("sms_id");
+                sms_destinatario = ((JSONObject) data.get(0)).getString("sms_destinatario");
+                sms_mensaje = ((JSONObject) data.get(0)).getString("sms_mensaje");
 
                 SmsManager sms = SmsManager.getDefault();
 
@@ -166,10 +166,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 for (int i = 0; i < numParts; i++) {
                     sentIntents.add(sentPI);
                     deliveryIntents.add(deliveredPI);
-                    sms.sendMultipartTextMessage(sms_destinatario, null, parts, sentIntents, deliveryIntents);
                 }
-            } else {
-                revisarPendientes();
+
+                sms.sendMultipartTextMessage(sms_destinatario, null, parts, sentIntents, deliveryIntents);
             }
 
 
@@ -202,24 +201,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         public void onReceive(Context context, Intent intent) {
 
-
             String resultRecepcionado;
             String action = intent.getAction();
 
-            String number = intent.getStringExtra(EXTRA_NUMBER);
-            String message = intent.getStringExtra(EXTRA_MESSAGE);
-            String sms_id = intent.getStringExtra(EXTRA_ID);
+            String numero = intent.getStringExtra(EXTRA_NUMBER);
+            String mensaje = intent.getStringExtra(EXTRA_MESSAGE);
+            String id_sms = intent.getStringExtra(EXTRA_ID);
 
             if (SMS_SENT_ACTION.equals(action)) {
                 int resultCode = getResultCode();
                 try {
                     JSONObject body = new JSONObject();
-                    body.put(EXTRA_NUMBER, number);
-                    body.put(EXTRA_MESSAGE, message);
-                    body.put(EXTRA_ID, sms_id);
+                    body.put(EXTRA_NUMBER, numero);
+                    body.put(EXTRA_MESSAGE, mensaje);
+                    body.put(EXTRA_ID, id_sms);
                     body.put("resultCode", resultCode);
                     resultEnvio = translateSentResult(body);
-                    Toast.makeText(context, number + " - " + message + resultEnvio, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(context, numero + " - " + mensaje + resultEnvio, Toast.LENGTH_SHORT).show();
 
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -261,7 +259,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             //{"message":"Se actualizó el estado del registro.","status":true}
 
                         } catch (Exception e) {
-                            Log.e("LogResponseError", cadena_respuesta);
+                            Log.e("LogResponseError", e.toString());
                         }
                     }
                 }
@@ -325,13 +323,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void ejecutarTarea() {
         handler.postDelayed(new Runnable() {
             public void run() {
-
-                count = count + 1;
-                SendMessage(cadena_respuesta);
+                //count = count + 1;
+                revisarPendientes();
                 handler.postDelayed(this, TIEMPO);
             }
 
         }, TIEMPO);
 
     }
+
 }
