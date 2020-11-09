@@ -22,8 +22,6 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -39,36 +37,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private static final int MY_PERMISSIONS_REQUEST_SEND_SMS = 1;
     Button btnEnviar;
-    String sms_destinatario;
-    String sms_mensaje;
 
-    private static final String SMS_SENT_ACTION = "com.mycompany.myapp.SMS_SENT";
-    private static final String SMS_DELIVERED_ACTION = "com.mycompany.myapp.SMS_DELIVERED";
-    private int requestCode = 33;
 
+    private static final String SMS_SENT_ACTION = "pe.reloadersystem.msgenvio.SMS_SENT";
+    private static final String SMS_DELIVERED_ACTION = "pe.reloadersystem.msgenvio.SMS_DELIVERED";
     private static final String EXTRA_NUMBER = "number";
     private static final String EXTRA_MESSAGE = "message";
-    private static final String EXTRA_ID = "sms_id";
-
+    private SmsManager sms;
     private BroadcastReceiver resultsReceiver;
     private IntentFilter intentFilter;
-
-    int count = 0;
-
+    int requestCode;
     int code;
-
-    Handler handler = new Handler();
-
-    private final int TIEMPO = 10000;
     String resultEnvio;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         btnEnviar = findViewById(R.id.btnEnviarMSG);
+
+        sms = SmsManager.getDefault();
         resultsReceiver = new SmsResultReceiver();
+
         intentFilter = new IntentFilter(SMS_SENT_ACTION);
         intentFilter.addAction(SMS_DELIVERED_ACTION);
 
@@ -103,7 +94,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         JSONObject verifydata = new JSONObject(cadena_respuesta);
                         Boolean estado = Boolean.valueOf(verifydata.getString("status"));
                         if (estado) {
-                            SendMessage(cadena_respuesta);
+
+                            JSONArray data = verifydata.getJSONArray("data");
+
+                            String datostosend = String.valueOf(data.length());
+                            Log.d("datostosend", datostosend);
+
+                            code = (int) ((JSONObject) data.get(0)).get("sms_id");
+                            String sms_destinatario = ((JSONObject) data.get(0)).getString("sms_destinatario");
+                            String sms_mensaje = ((JSONObject) data.get(0)).getString("sms_mensaje");
+
+                            SendMessage(code, sms_destinatario, sms_mensaje);
                         } else {
                             Toast.makeText(MainActivity.this, "No hay pendientes", Toast.LENGTH_SHORT).show();
                         }
@@ -120,56 +121,33 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         });
     }
 
-    private void SendMessage(String cadena_respuesta) {
+    private void SendMessage(int code, String sms_destinatario, String sms_mensaje) {
 
         try {
-            JSONObject respuesta = new JSONObject(cadena_respuesta);
-            JSONArray data = respuesta.getJSONArray("data");
 
-            String datostosend = String.valueOf(data.length());
-            Log.d("datostosend", datostosend);
+            Intent sentIntent = new Intent(SMS_SENT_ACTION);
+            Intent deliveredIntent = new Intent(SMS_DELIVERED_ACTION);
 
-            if (count < data.length()) {
-                code = (int) ((JSONObject) data.get(0)).get("sms_id");
-                sms_destinatario = ((JSONObject) data.get(0)).getString("sms_destinatario");
-                sms_mensaje = ((JSONObject) data.get(0)).getString("sms_mensaje");
+            sentIntent.putExtra(EXTRA_NUMBER, sms_destinatario);
+            sentIntent.putExtra(EXTRA_MESSAGE, sms_mensaje);
 
-                SmsManager sms = SmsManager.getDefault();
 
-                Intent sentIntent = new Intent(SMS_SENT_ACTION);
-                Intent deliveredIntent = new Intent(SMS_DELIVERED_ACTION);
+            deliveredIntent.putExtra(EXTRA_NUMBER, sms_destinatario);
+            deliveredIntent.putExtra(EXTRA_MESSAGE, sms_mensaje);
 
-                sentIntent.putExtra(EXTRA_NUMBER, sms_destinatario);
-                sentIntent.putExtra(EXTRA_MESSAGE, sms_mensaje);
-                sentIntent.putExtra(EXTRA_ID, code);
+            requestCode += 1;
 
-                deliveredIntent.putExtra(EXTRA_NUMBER, sms_destinatario);
-                deliveredIntent.putExtra(EXTRA_MESSAGE, sms_mensaje);
-                deliveredIntent.putExtra(EXTRA_ID, code);
+            PendingIntent sentPI = PendingIntent.getBroadcast(this,
+                    requestCode,
+                    sentIntent,
+                    PendingIntent.FLAG_ONE_SHOT);
 
-                ArrayList<String> parts = sms.divideMessage(sms_mensaje);
-                int numParts = parts.size();
+            PendingIntent deliveredPI = PendingIntent.getBroadcast(this,
+                    requestCode,
+                    deliveredIntent,
+                    PendingIntent.FLAG_ONE_SHOT);
 
-                ArrayList<PendingIntent> sentIntents = new ArrayList<>();
-                ArrayList<PendingIntent> deliveryIntents = new ArrayList<>();
-
-                PendingIntent sentPI = PendingIntent.getBroadcast(this,
-                        requestCode,
-                        sentIntent,
-                        PendingIntent.FLAG_ONE_SHOT);
-
-                PendingIntent deliveredPI = PendingIntent.getBroadcast(this,
-                        requestCode,
-                        deliveredIntent,
-                        PendingIntent.FLAG_ONE_SHOT);
-
-                for (int i = 0; i < numParts; i++) {
-                    sentIntents.add(sentPI);
-                    deliveryIntents.add(deliveredPI);
-                }
-
-                sms.sendMultipartTextMessage(sms_destinatario, null, parts, sentIntents, deliveryIntents);
-            }
+            sms.sendTextMessage(sms_destinatario, null, sms_mensaje, sentPI, deliveredPI);
 
 
         } catch (Exception e) {
@@ -180,19 +158,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onPause() {
         super.onPause();
-
-        if (resultsReceiver != null) {
-            unregisterReceiver(resultsReceiver);
-        }
+        unregisterReceiver(resultsReceiver);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-
-        if (resultsReceiver != null) {
-            registerReceiver(resultsReceiver, intentFilter);
-        }
+        registerReceiver(resultsReceiver, intentFilter);
     }
 
 
@@ -200,36 +172,58 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         @Override
         public void onReceive(Context context, Intent intent) {
+            String result = null;
 
             String resultRecepcionado;
+
             String action = intent.getAction();
 
             String numero = intent.getStringExtra(EXTRA_NUMBER);
             String mensaje = intent.getStringExtra(EXTRA_MESSAGE);
-            String id_sms = intent.getStringExtra(EXTRA_ID);
+
 
             if (SMS_SENT_ACTION.equals(action)) {
                 int resultCode = getResultCode();
-                try {
-                    JSONObject body = new JSONObject();
-                    body.put(EXTRA_NUMBER, numero);
-                    body.put(EXTRA_MESSAGE, mensaje);
-                    body.put(EXTRA_ID, id_sms);
-                    body.put("resultCode", resultCode);
-                    resultEnvio = translateSentResult(body);
-                    Toast.makeText(context, numero + " - " + mensaje + resultEnvio, Toast.LENGTH_SHORT).show();
+                resultEnvio = translateSentResult(resultCode);
+                Toast.makeText(context, numero + " - " + mensaje + resultEnvio, Toast.LENGTH_SHORT).show();
 
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    Toast.makeText(context, "Broadcast de envio", Toast.LENGTH_SHORT).show();
-                }
+                ItemPostsms loguinRequest = new ItemPostsms(code, resultEnvio);
+
+                MethodWs methodWs = HelperWs.getConfiguration(getApplicationContext()).create(MethodWs.class);
+                Call<ResponseBody> responseBodyCall = methodWs.sendUpdateSMS(loguinRequest);
+                responseBodyCall.enqueue(new Callback<ResponseBody>() {
+                    @Override
+                    public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+
+                        if (response.isSuccessful()) {
+                            ResponseBody info = response.body();
+                            try {
+
+                                String cadena_respuesta = info.string();
+                                Log.e("LogResponse", cadena_respuesta);
+
+                                ejecutarTarea();
+
+                                //{"message":"Se actualizó el estado del registro.","status":true}
+
+                            } catch (Exception e) {
+                                Log.e("LogResponseError", e.toString());
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<ResponseBody> call, Throwable t) {
+
+                    }
+                });
+
             } else if (SMS_DELIVERED_ACTION.equals(action)) {
                 SmsMessage sms = null;
                 byte[] pdu = intent.getByteArrayExtra("pdu");
                 String format = intent.getStringExtra("format");
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && format != null) {
-//                        sms = SmsMessage.createFromPdu(pdu, format);
-                    sms = SmsMessage.createFromPdu(pdu);
+                    sms = SmsMessage.createFromPdu(pdu, format);
                 } else {
                     sms = SmsMessage.createFromPdu(pdu);
                 }
@@ -239,69 +233,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Toast.makeText(context, resultRecepcionado, Toast.LENGTH_SHORT).show();
             }
 
-            ItemPostsms loguinRequest = new ItemPostsms(code, resultEnvio);
 
-            MethodWs methodWs = HelperWs.getConfiguration(getApplicationContext()).create(MethodWs.class);
-            Call<ResponseBody> responseBodyCall = methodWs.sendUpdateSMS(loguinRequest);
-            responseBodyCall.enqueue(new Callback<ResponseBody>() {
-                @Override
-                public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-
-                    if (response.isSuccessful()) {
-                        ResponseBody info = response.body();
-                        try {
-
-                            String cadena_respuesta = info.string();
-                            Log.e("LogResponse", cadena_respuesta);
-
-                            ejecutarTarea();
-
-                            //{"message":"Se actualizó el estado del registro.","status":true}
-
-                        } catch (Exception e) {
-                            Log.e("LogResponseError", e.toString());
-                        }
-                    }
-                }
-
-                @Override
-                public void onFailure(Call<ResponseBody> call, Throwable t) {
-
-                }
-            });
         }
     }
 
 
-    private String translateSentResult(JSONObject params) {
-        String mensaje = null;
-        System.out.println(params);
-        try {
-            switch (params.getInt("resultCode")) {
-                case Activity.RESULT_OK:
-                    mensaje = "RESULT_OK";
-                    break;
-                case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
-                    mensaje = "SmsManager.RESULT_ERROR_GENERIC_FAILURE";
-                    break;
-                case SmsManager.RESULT_ERROR_RADIO_OFF:
-                    mensaje = "SmsManager.RESULT_ERROR_RADIO_OFF";
-                    break;
-                case SmsManager.RESULT_ERROR_NULL_PDU:
-                    mensaje = "SmsManager.RESULT_ERROR_NULL_PDU";
-                    break;
-                case SmsManager.RESULT_ERROR_NO_SERVICE:
-                    mensaje = "SmsManager.RESULT_ERROR_NO_SERVICE";
-                    break;
-                default:
-                    mensaje = "Unknown error code";
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            Log.e("SINCODIGO", ex.getMessage());
-        }
+    private String translateSentResult(int resultcode) {
 
-        return mensaje;
+        switch (resultcode) {
+            case Activity.RESULT_OK:
+                return "Activity.RESULT_OK";
+            case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
+                return "SmsManager.RESULT_ERROR_GENERIC_FAILURE";
+            case SmsManager.RESULT_ERROR_RADIO_OFF:
+                return "SmsManager.RESULT_ERROR_RADIO_OFF";
+            case SmsManager.RESULT_ERROR_NULL_PDU:
+                return "SmsManager.RESULT_ERROR_NULL_PDU";
+            case SmsManager.RESULT_ERROR_NO_SERVICE:
+                return "SmsManager.RESULT_ERROR_NO_SERVICE";
+            default:
+                return "Unknown error code";
+        }
     }
 
     String translateDeliveryStatus(int status) {
@@ -321,15 +273,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
 
     public void ejecutarTarea() {
-        handler.postDelayed(new Runnable() {
+
+        new Handler().postDelayed(new Runnable() {
+            @Override
             public void run() {
-                //count = count + 1;
                 revisarPendientes();
-                handler.postDelayed(this, TIEMPO);
             }
-
-        }, TIEMPO);
-
+        }, 3000);
     }
-
 }
