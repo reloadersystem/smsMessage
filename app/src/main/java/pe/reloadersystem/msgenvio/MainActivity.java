@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -26,9 +27,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import okhttp3.ResponseBody;
-import pe.reloadersystem.msgenvio.Servicios.Retrofit.HelperWs;
-import pe.reloadersystem.msgenvio.Servicios.Retrofit.ItemPostsms;
-import pe.reloadersystem.msgenvio.Servicios.Retrofit.MethodWs;
+import pe.reloadersystem.msgenvio.servicios.Retrofit.HelperWs;
+import pe.reloadersystem.msgenvio.servicios.Retrofit.ItemPostsms;
+import pe.reloadersystem.msgenvio.servicios.Retrofit.MethodWs;
+import pe.reloadersystem.msgenvio.utils.ShareDataRead;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -37,7 +39,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private static final int MY_PERMISSIONS_REQUEST_SEND_SMS = 1;
     Button btnEnviar;
-
 
     private static final String SMS_SENT_ACTION = "pe.reloadersystem.msgenvio.SMS_SENT";
     private static final String SMS_DELIVERED_ACTION = "pe.reloadersystem.msgenvio.SMS_DELIVERED";
@@ -49,6 +50,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     int requestCode;
     int code;
     String resultEnvio;
+    int smsCount = 0;
+    int datostosend = 0;
+    Handler handler = new Handler();
+    private final int TIEMPO = 20000;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,7 +80,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS},
                     MY_PERMISSIONS_REQUEST_SEND_SMS);
         } else {
-            revisarPendientes();
+
+            SharedPreferences sharpref = getSharedPreferences("sms_wait", MODE_PRIVATE);
+
+            if (sharpref.contains("codigo")) {
+                int codigo = Integer.parseInt(ShareDataRead.obtenerValor(getApplicationContext(), "codigo"));
+                String result = ShareDataRead.obtenerValor(getApplicationContext(), "result");
+                updateService(codigo, result);
+            } else {
+                revisarPendientes();
+            }
         }
 
     }
@@ -96,9 +111,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         if (estado) {
 
                             JSONArray data = verifydata.getJSONArray("data");
-
-                            String datostosend = String.valueOf(data.length());
-                            Log.d("datostosend", datostosend);
+                            datostosend = data.length();
+                            Log.d("datostosend", String.valueOf(datostosend));
 
                             code = (int) ((JSONObject) data.get(0)).get("sms_id");
                             String sms_destinatario = ((JSONObject) data.get(0)).getString("sms_destinatario");
@@ -107,6 +121,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             SendMessage(code, sms_destinatario, sms_mensaje);
                         } else {
                             Toast.makeText(MainActivity.this, "No hay pendientes", Toast.LENGTH_SHORT).show();
+                            buscaPendientes();
+
                         }
                     } catch (Exception e) {
                         Log.e("LogResponseError", e.toString());
@@ -116,7 +132,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             @Override
             public void onFailure(Call<ResponseBody> call, Throwable t) {
-                Log.e("LogeError", t.toString());
+                Toast.makeText(MainActivity.this, "Error de Conexión", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -186,37 +202,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 int resultCode = getResultCode();
                 resultEnvio = translateSentResult(resultCode);
                 Toast.makeText(context, numero + " - " + mensaje + resultEnvio, Toast.LENGTH_SHORT).show();
-
-                ItemPostsms loguinRequest = new ItemPostsms(code, resultEnvio);
-
-                MethodWs methodWs = HelperWs.getConfiguration(getApplicationContext()).create(MethodWs.class);
-                Call<ResponseBody> responseBodyCall = methodWs.sendUpdateSMS(loguinRequest);
-                responseBodyCall.enqueue(new Callback<ResponseBody>() {
-                    @Override
-                    public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-
-                        if (response.isSuccessful()) {
-                            ResponseBody info = response.body();
-                            try {
-
-                                String cadena_respuesta = info.string();
-                                Log.e("LogResponse", cadena_respuesta);
-
-                                ejecutarTarea();
-
-                                //{"message":"Se actualizó el estado del registro.","status":true}
-
-                            } catch (Exception e) {
-                                Log.e("LogResponseError", e.toString());
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<ResponseBody> call, Throwable t) {
-
-                    }
-                });
+                updateService(code, resultEnvio);
 
             } else if (SMS_DELIVERED_ACTION.equals(action)) {
                 SmsMessage sms = null;
@@ -232,9 +218,46 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 Toast.makeText(context, resultRecepcionado, Toast.LENGTH_SHORT).show();
             }
-
-
         }
+    }
+
+    private void updateService(final int code, final String resultEnvio) {
+        ItemPostsms loguinRequest = new ItemPostsms(code, resultEnvio);
+        MethodWs methodWs = HelperWs.getConfiguration(getApplicationContext()).create(MethodWs.class);
+        Call<ResponseBody> responseBodyCall = methodWs.sendUpdateSMS(loguinRequest);
+        responseBodyCall.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+
+                if (response.isSuccessful()) {
+                    ResponseBody info = response.body();
+                    try {
+
+                        String cadena_respuesta = info.string();
+                        Log.e("LogResponse", cadena_respuesta);
+
+                        SharedPreferences settings = getSharedPreferences("sms_wait", Context.MODE_PRIVATE);
+                        settings.edit().clear().commit();
+
+                        ejecutarTarea();
+
+                        //{"message":"Se actualizó el estado del registro.","status":true}
+
+                    } catch (Exception e) {
+
+                        Toast.makeText(MainActivity.this, "Falto guardar sms enviados", Toast.LENGTH_SHORT).show();
+
+                        ShareDataRead.guardarValor(getApplicationContext(), "codigo", String.valueOf(code));
+                        ShareDataRead.guardarValor(getApplicationContext(), "result", resultEnvio);
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+
+            }
+        });
     }
 
 
@@ -280,5 +303,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 revisarPendientes();
             }
         }, 3000);
+    }
+
+    public void buscaPendientes() {
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                revisarPendientes();
+            }
+        }, TIEMPO);
     }
 }

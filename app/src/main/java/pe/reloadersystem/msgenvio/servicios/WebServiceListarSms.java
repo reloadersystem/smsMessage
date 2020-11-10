@@ -1,4 +1,4 @@
-package pe.reloadersystem.msgenvio.Servicios;
+package pe.reloadersystem.msgenvio.servicios;
 
 import android.app.PendingIntent;
 import android.content.Context;
@@ -11,8 +11,8 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 
 import okhttp3.ResponseBody;
-import pe.reloadersystem.msgenvio.Servicios.Retrofit.HelperWs;
-import pe.reloadersystem.msgenvio.Servicios.Retrofit.MethodWs;
+import pe.reloadersystem.msgenvio.servicios.Retrofit.HelperWs;
+import pe.reloadersystem.msgenvio.servicios.Retrofit.MethodWs;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;

@@ -1,4 +1,4 @@
-package pe.reloadersystem.msgenvio.Servicios.Retrofit;
+package pe.reloadersystem.msgenvio.servicios.Retrofit;
 
 import okhttp3.ResponseBody;
 import retrofit2.Call;

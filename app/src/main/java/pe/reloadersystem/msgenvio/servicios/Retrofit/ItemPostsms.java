@@ -1,4 +1,4 @@
-package pe.reloadersystem.msgenvio.Servicios.Retrofit;
+package pe.reloadersystem.msgenvio.servicios.Retrofit;
 
 public class ItemPostsms {
     int sms_id;
