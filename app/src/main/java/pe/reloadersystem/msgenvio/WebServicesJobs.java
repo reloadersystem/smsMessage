@@ -9,11 +9,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.os.Handler;
 import android.provider.Telephony;
 import android.telephony.SmsManager;
-import android.telephony.SmsMessage;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -50,7 +48,7 @@ public class WebServicesJobs extends JobService {
     int requestCode;
     int code;
     String resultEnvio;
-    SmsSentReceiver smsSentReceiver;
+    SmsResultReceiverData smsSentReceiver;
 
     @Override
     public boolean onStartJob(JobParameters jobParameters) {
@@ -59,9 +57,10 @@ public class WebServicesJobs extends JobService {
         sms = SmsManager.getDefault();
 
 //        resultsReceiver = new SmsResultReceiver();
-        intentFilter = new IntentFilter(SMS_SENT_ACTION);
-        intentFilter.addAction(SMS_DELIVERED_ACTION);
-        smsSentReceiver = new SmsSentReceiver();
+        smsSentReceiver = new SmsResultReceiverData();
+//        intentFilter = new IntentFilter(SMS_SENT_ACTION);
+//        intentFilter.addAction(SMS_DELIVERED_ACTION);
+
         doBackWork(jobParameters);
 
         return true;
@@ -81,7 +80,6 @@ public class WebServicesJobs extends JobService {
         jobCancelled = true;
         return true;
     }
-
 
 
     private String translateSentResult(int resultcode) {
@@ -141,8 +139,8 @@ public class WebServicesJobs extends JobService {
                             String sms_destinatario = ((JSONObject) data.get(0)).getString("sms_destinatario");
                             String sms_mensaje = ((JSONObject) data.get(0)).getString("sms_mensaje");
 
-                            //SendMessage(code, sms_destinatario, sms_mensaje);
-                            SmsResultReceiverData.SendMessage(context,code, sms_destinatario, sms_mensaje);
+                            SendMessage(code, sms_destinatario, sms_mensaje);
+                            //SmsResultReceiverData.SendMessage(context,code, sms_destinatario, sms_mensaje);
                         } else {
                             // Toast.makeText(context, "No hay pendientes", Toast.LENGTH_SHORT).show();
                             handlerToastMessage(context, "No hay pendientes", 0);
@@ -220,33 +218,50 @@ public class WebServicesJobs extends JobService {
         }, 3000);
     }
 
-    private void SendMessage(int code, String sms_destinatario, String sms_mensaje) {
+    private void SendMessage(int code, String sms_numero, String sms_message) {
 
         try {
 
-            Intent sentIntent = new Intent(SMS_SENT_ACTION);
-            Intent deliveredIntent = new Intent(SMS_DELIVERED_ACTION);
-
-            sentIntent.putExtra(EXTRA_NUMBER, sms_destinatario);
-            sentIntent.putExtra(EXTRA_MESSAGE, sms_mensaje);
-
-
-            deliveredIntent.putExtra(EXTRA_NUMBER, sms_destinatario);
-            deliveredIntent.putExtra(EXTRA_MESSAGE, sms_mensaje);
+//            Intent sentIntent = new Intent(SMS_SENT_ACTION);
+//            Intent deliveredIntent = new Intent(SMS_DELIVERED_ACTION);
+//
+//            sentIntent.putExtra(EXTRA_NUMBER, sms_numero);
+//            sentIntent.putExtra(EXTRA_MESSAGE, sms_message);
+//
+//
+//            deliveredIntent.putExtra(EXTRA_NUMBER, sms_numero);
+//            deliveredIntent.putExtra(EXTRA_MESSAGE, sms_message);
 
             requestCode += 1;
 
-            PendingIntent sentPI = PendingIntent.getBroadcast(this,
-                    requestCode,
-                    sentIntent,
-                    PendingIntent.FLAG_ONE_SHOT);
+            Intent sendPIntent = new Intent(context, SmsResultReceiverData.class);
+            sendPIntent.putExtra("sms_numero", sms_numero);
+            sendPIntent.putExtra("sms_message", sms_message);
+            sendPIntent.putExtra("sms_code", code);
 
-            PendingIntent deliveredPI = PendingIntent.getBroadcast(this,
-                    requestCode,
-                    deliveredIntent,
-                    PendingIntent.FLAG_ONE_SHOT);
 
-            sms.sendTextMessage(sms_destinatario, null, sms_mensaje, sentPI, deliveredPI);
+
+            PendingIntent sentPI = PendingIntent.getBroadcast(context, requestCode,
+                    sendPIntent, PendingIntent.FLAG_ONE_SHOT);
+
+//            PendingIntent sentPI = PendingIntent.getBroadcast(this,
+//                    requestCode,
+//                    sentIntent,
+//                    PendingIntent.FLAG_ONE_SHOT);
+
+            Intent intentDPi = new Intent(context, SmsDeliveredReceiver.class);
+            intentDPi.putExtra("sms_numero", sms_numero);
+            intentDPi.putExtra("sms_message", sms_message);
+
+            PendingIntent deliveredPI = PendingIntent.getBroadcast(context, requestCode,
+                    intentDPi, PendingIntent.FLAG_ONE_SHOT);
+
+//            PendingIntent deliveredPI = PendingIntent.getBroadcast(this,
+//                    requestCode,
+//                    deliveredIntent,
+//                    PendingIntent.FLAG_ONE_SHOT);
+
+            sms.sendTextMessage(sms_numero, null, sms_message, sentPI, deliveredPI);
 
 
         } catch (Exception e) {
@@ -266,48 +281,47 @@ public class WebServicesJobs extends JobService {
         });
     }
 
-    public class SmsResultReceiver extends BroadcastReceiver {
+//    public class SmsResultReceiver extends BroadcastReceiver {
+////
+//        @Override
+//        public void onReceive(Context context, Intent intent) {
+//            String result = null;
 //
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String result = null;
-
-            String resultRecepcionado;
-
-            String action = intent.getAction();
-
-            String numero = intent.getStringExtra(EXTRA_NUMBER);
-            String mensaje = intent.getStringExtra(EXTRA_MESSAGE);
-
-
-            if (SMS_SENT_ACTION.equals(action)) {
-                int resultCode = getResultCode();
-                resultEnvio = translateSentResult(resultCode);
-                Toast.makeText(context, numero + " - " + mensaje + resultEnvio, Toast.LENGTH_SHORT).show();
-                if (resultEnvio.equals("Activity.RESULT_OK")) {
-                    updateService(code, "");
-                } else {
-                    updateService(code, resultEnvio);
-                }
-
-
-            } else if (SMS_DELIVERED_ACTION.equals(action)) {
-                SmsMessage sms = null;
-                byte[] pdu = intent.getByteArrayExtra("pdu");
-                String format = intent.getStringExtra("format");
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && format != null) {
-                    sms = SmsMessage.createFromPdu(pdu, format);
-                } else {
-                    sms = SmsMessage.createFromPdu(pdu);
-                }
-
-                resultRecepcionado = translateDeliveryStatus(sms.getStatus());
-
-                Toast.makeText(context, resultRecepcionado, Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
+//            String resultRecepcionado;
+//
+//            String action = intent.getAction();
+//
+//            String numero = intent.getStringExtra(EXTRA_NUMBER);
+//            String mensaje = intent.getStringExtra(EXTRA_MESSAGE);
+//
+//
+//            if (SMS_SENT_ACTION.equals(action)) {
+//                int resultCode = getResultCode();
+//                resultEnvio = translateSentResult(resultCode);
+//                Toast.makeText(context, numero + " - " + mensaje + resultEnvio, Toast.LENGTH_SHORT).show();
+//                if (resultEnvio.equals("Activity.RESULT_OK")) {
+//                    updateService(code, "");
+//                } else {
+//                    updateService(code, resultEnvio);
+//                }
+//
+//
+//            } else if (SMS_DELIVERED_ACTION.equals(action)) {
+//                SmsMessage sms = null;
+//                byte[] pdu = intent.getByteArrayExtra("pdu");
+//                String format = intent.getStringExtra("format");
+//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && format != null) {
+//                    sms = SmsMessage.createFromPdu(pdu, format);
+//                } else {
+//                    sms = SmsMessage.createFromPdu(pdu);
+//                }
+//
+//                resultRecepcionado = translateDeliveryStatus(sms.getStatus());
+//
+//                Toast.makeText(context, resultRecepcionado, Toast.LENGTH_SHORT).show();
+//            }
+//        }
+//    }
 
 
 }
