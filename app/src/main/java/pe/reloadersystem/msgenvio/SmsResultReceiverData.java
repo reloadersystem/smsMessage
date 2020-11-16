@@ -1,9 +1,13 @@
 package pe.reloadersystem.msgenvio;
 
 import android.app.Activity;
+import android.app.job.JobInfo;
+import android.app.job.JobScheduler;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Handler;
 import android.telephony.SmsManager;
 import android.util.Log;
@@ -13,16 +17,20 @@ import okhttp3.ResponseBody;
 import pe.reloadersystem.msgenvio.servicios.Retrofit.HelperWs;
 import pe.reloadersystem.msgenvio.servicios.Retrofit.ItemPostsms;
 import pe.reloadersystem.msgenvio.servicios.Retrofit.MethodWs;
-import pe.reloadersystem.msgenvio.utils.ShareDataRead;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+
+import static android.content.Context.JOB_SCHEDULER_SERVICE;
 
 public class SmsResultReceiverData extends BroadcastReceiver {
 
     private static final String EXTRA_NUMBER = "sms_numero";
     private static final String EXTRA_MESSAGE = "sms_message";
     private static final String EXTRA_CODE = "sms_code";
+    private static final int ID_SERVICIO = 99;
+    private static final String TAG = "SmsResultClass";
+    private static final int PERIOD_MS = 5000;
 
     public void onReceive(Context context, Intent intent) {
 
@@ -47,13 +55,16 @@ public class SmsResultReceiverData extends BroadcastReceiver {
                 case SmsManager.RESULT_ERROR_NO_SERVICE:
                     Toast.makeText(context, "SMS no service", Toast.LENGTH_SHORT)
                             .show();
+                    updateService(code, "SMS no service", context);
 
                     break;
                 case SmsManager.RESULT_ERROR_NULL_PDU:
                     Toast.makeText(context, "SMS null PDU", Toast.LENGTH_SHORT).show();
+                    updateService(code, "SMS null PDU", context);
                     break;
                 case SmsManager.RESULT_ERROR_RADIO_OFF:
                     Toast.makeText(context, "SMS radio off", Toast.LENGTH_SHORT).show();
+                    updateService(code, "SMS radio off", context);
                     break;
             }
         } catch (Exception ex) {
@@ -77,36 +88,22 @@ public class SmsResultReceiverData extends BroadcastReceiver {
                         String cadena_respuesta = info.string();
                         Log.e("LogResponse", cadena_respuesta);
 
-                        ejecutarTarea();
-
                         //{"message":"Se actualizó el estado del registro.","status":true}
 
+                        cancelJob(context);
+                        reiniciarServicio(context);
+
                     } catch (Exception e) {
-
-                       // Toast.makeText(context, "Falto guardar sms enviados", Toast.LENGTH_SHORT).show();
                         handlerToastMessage(context, "Falto guardar sms enviados", code);
-
-                        ShareDataRead.guardarValor(context, "codigo", String.valueOf(code));
-                        ShareDataRead.guardarValor(context, "result", resultEnvio);
                     }
                 }
             }
 
             @Override
             public void onFailure(Call<ResponseBody> call, Throwable t) {
-
+                Log.e("LogError", t.toString());
             }
         });
-    }
-
-    public void ejecutarTarea() {
-
-        new Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                //revisarPendientes();
-            }
-        }, 3000);
     }
 
 
@@ -122,5 +119,37 @@ public class SmsResultReceiverData extends BroadcastReceiver {
         });
     }
 
+    public void cancelJob(Context context) {
+
+        JobScheduler scheduler = (JobScheduler) context.getSystemService(JOB_SCHEDULER_SERVICE);
+        scheduler.cancel(ID_SERVICIO);
+        Log.d(TAG, "Job Cancelled");
+    }
+
+    public void reiniciarServicio(Context context) {
+        ComponentName componentName = new ComponentName(context, WebServicesJobs.class);
+        JobInfo info;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            info = new JobInfo.Builder(ID_SERVICIO, componentName)
+                    .setPersisted(true)
+                    .setMinimumLatency(PERIOD_MS)
+                    .build();
+        } else {
+            info = new JobInfo.Builder(ID_SERVICIO, componentName)
+                    .setPersisted(true)
+                    .setPeriodic(PERIOD_MS)
+                    .build();
+        }
+
+        JobScheduler scheduler = (JobScheduler) context.getSystemService(JOB_SCHEDULER_SERVICE);
+        int resultCode = scheduler.schedule(info);
+        if (resultCode == JobScheduler.RESULT_SUCCESS) {
+            Log.d(TAG, "Job scheduled");
+
+        } else {
+            Log.d(TAG, "Job scheduling failed");
+        }
+    }
 
 }
