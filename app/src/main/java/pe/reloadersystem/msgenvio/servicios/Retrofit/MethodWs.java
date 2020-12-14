@@ -17,6 +17,4 @@ public interface MethodWs {
 
     @POST("actualizarSmsEnviado")
     Call<ResponseBody> sendUpdateSMS(@Body ItemPostsms entity_alumnoSms);
-
-
 }

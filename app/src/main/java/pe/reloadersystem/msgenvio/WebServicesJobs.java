@@ -15,6 +15,8 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+
 import okhttp3.ResponseBody;
 import pe.reloadersystem.msgenvio.servicios.Retrofit.HelperWs;
 import pe.reloadersystem.msgenvio.servicios.Retrofit.MethodWs;
@@ -27,7 +29,7 @@ public class WebServicesJobs extends JobService {
     private static final String TAG = "ExampleJOB";
     private boolean jobCancelled = false;
     private Context context = this;
-    private final int TIEMPO = 20000;
+    private final int TIEMPO =10000;
     Handler handler = new Handler();
     int datostosend = 0;
 
@@ -131,6 +133,10 @@ public class WebServicesJobs extends JobService {
 
             requestCode += 1;
 
+
+            ArrayList<String> parts  = sms.divideMessage(sms_message);
+            int numParts = parts.size();
+
             Intent sendPIntent = new Intent(context, SmsResultReceiverData.class);
             sendPIntent.putExtra("sms_numero", sms_numero);
             sendPIntent.putExtra("sms_message", sms_message);
@@ -148,7 +154,19 @@ public class WebServicesJobs extends JobService {
             PendingIntent deliveredPI = PendingIntent.getBroadcast(context, requestCode,
                     intentDPi, PendingIntent.FLAG_ONE_SHOT);
 
-            sms.sendTextMessage(sms_numero, null, sms_message, sentPI, deliveredPI);
+
+            ArrayList<PendingIntent> sentIntents = new ArrayList<PendingIntent>();
+            ArrayList<PendingIntent> deliveryIntents = new ArrayList<PendingIntent>();
+
+            for (int i = 0; i < numParts; i++) {
+                sentIntents.add(sentPI);
+                deliveryIntents.add(deliveredPI);
+            }
+
+
+//            sms.sendTextMessage(sms_numero, null, sms_message, sentPI, deliveredPI);
+
+            sms.sendMultipartTextMessage(sms_numero, null, parts , sentIntents,deliveryIntents);
 
 
         } catch (Exception e) {

@@ -22,7 +22,7 @@ import androidx.core.content.ContextCompat;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     private static final int MY_PERMISSIONS_REQUEST_SEND_SMS = 1;
-    Button btnEnviar;
+
 
     private static final String SMS_SENT_ACTION = "pe.reloadersystem.msgenvio.SMS_SENT";
     private static final String SMS_DELIVERED_ACTION = "pe.reloadersystem.msgenvio.SMS_DELIVERED";
@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        btnEnviar = findViewById(R.id.btnEnviarMSG);
+
         btn_schudlejob = findViewById(R.id.btn_schudlejob);
 
 
