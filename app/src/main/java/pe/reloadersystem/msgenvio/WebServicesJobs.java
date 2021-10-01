@@ -12,6 +12,10 @@ import android.telephony.SmsManager;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -26,10 +30,12 @@ import retrofit2.Response;
 
 public class WebServicesJobs extends JobService {
 
+    FirebaseFirestore mFirestore;
+
     private static final String TAG = "ExampleJOB";
     private boolean jobCancelled = false;
     private Context context = this;
-    private final int TIEMPO =10000;
+    private final int TIEMPO = 10000;
     Handler handler = new Handler();
     int datostosend = 0;
 
@@ -71,8 +77,30 @@ public class WebServicesJobs extends JobService {
         return true;
     }
 
-
     private void revisarPendientes() {
+
+        mFirestore = FirebaseFirestore.getInstance();
+
+        mFirestore.collection("data").whereEqualTo("estado_id", 2623).get().addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
+            @Override
+            public void onSuccess(QuerySnapshot queryDocumentSnapshots) {
+
+                if (!queryDocumentSnapshots.isEmpty()) {
+
+                    for (int a = 0; a < queryDocumentSnapshots.size(); a++) {
+
+                        Log.d("Firebase", "Datos doc: " + queryDocumentSnapshots.getDocuments());
+                    }
+
+                }
+
+            }
+        });
+
+
+    }
+
+    private void revisarPendiente() {
 
         MethodWs methodWs = HelperWs.getConfiguration(this).create(MethodWs.class);
         Call<ResponseBody> responseBodyCall = methodWs.getDatosSMS();
@@ -133,8 +161,7 @@ public class WebServicesJobs extends JobService {
 
             requestCode += 1;
 
-
-            ArrayList<String> parts  = sms.divideMessage(sms_message);
+            ArrayList<String> parts = sms.divideMessage(sms_message);
             int numParts = parts.size();
 
             Intent sendPIntent = new Intent(context, SmsResultReceiverData.class);
@@ -166,7 +193,7 @@ public class WebServicesJobs extends JobService {
 
 //            sms.sendTextMessage(sms_numero, null, sms_message, sentPI, deliveredPI);
 
-            sms.sendMultipartTextMessage(sms_numero, null, parts , sentIntents,deliveryIntents);
+            sms.sendMultipartTextMessage(sms_numero, null, parts, sentIntents, deliveryIntents);
 
 
         } catch (Exception e) {
@@ -180,7 +207,6 @@ public class WebServicesJobs extends JobService {
 
         handler.post(new Runnable() {
             public void run() {
-
                 Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show();
             }
         });

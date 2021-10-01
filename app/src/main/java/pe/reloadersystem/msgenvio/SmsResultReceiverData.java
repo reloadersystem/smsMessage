@@ -44,7 +44,7 @@ public class SmsResultReceiverData extends BroadcastReceiver {
                     Toast.makeText(context,
                             "Activity.RESULT_OK",
                             Toast.LENGTH_SHORT).show();
-                    updateService(code, "", context);
+                   updateService(code, "", context);
                     break;
                 case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
                     Toast.makeText(context, "SMS generic failure", Toast.LENGTH_SHORT)

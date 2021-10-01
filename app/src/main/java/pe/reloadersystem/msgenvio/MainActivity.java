@@ -15,9 +15,22 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
+
+import java.util.ArrayList;
+
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import pe.reloadersystem.msgenvio.entidades.ESms;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
@@ -45,6 +58,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     Button btn_schudlejob;
 
+    FirebaseFirestore mFirestore;
+
+    ArrayList<ESms> smsLista;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,11 +78,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //        intentFilter = new IntentFilter(SMS_SENT_ACTION);
 //        intentFilter.addAction(SMS_DELIVERED_ACTION);
 
-       // btnEnviar.setOnClickListener(this);
+        // btnEnviar.setOnClickListener(this);
         btn_schudlejob.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                beginJob();
+                // beginJob();
+
+                smsFirebase();
             }
         });
     }
@@ -320,7 +339,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //        }, TIEMPO);
 //    }
 
-    public void beginJob( ) {
+    public void beginJob() {
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -359,5 +378,187 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         JobScheduler scheduler = (JobScheduler) getSystemService(JOB_SCHEDULER_SERVICE);
         scheduler.cancel(ID_SERVICIO);
         Log.d(TAG, "Job Cancelled");
+    }
+
+
+    private void smsFirebase() {
+
+        smsLista = new ArrayList<>();
+
+        mFirestore = FirebaseFirestore.getInstance();
+        mFirestore.collection("data").whereEqualTo("estado_id", 2623).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+            @Override
+            public void onComplete(@NonNull Task<QuerySnapshot> task) {
+
+                if (task.isSuccessful()) {
+                    for (QueryDocumentSnapshot document : task.getResult()) {
+                        //Log.d(TAG, document.getId() + " => " + document.getData());
+                        String codeAuto = document.getId();
+                        int idestado = document.getLong("estado_id").intValue();
+                        String destinatario_sms = (String) document.get("sms_destinatario");
+                        String envio_error_sms = (String) document.get("sms_envio_error");
+                        Boolean envio_estado_sms = (Boolean) document.get("sms_envio_estado");
+                        Timestamp envio_fecha_sms = document.getTimestamp("sms_envio_fecha");
+                        Timestamp fecha_registro_sms = document.getTimestamp("sms_fecha_registro");
+                        int id_sms = document.getLong("sms_id").intValue();
+                        String mensaje_sms = (String) document.get("sms_mensaje");
+
+                        Log.d(TAG, String.valueOf(idestado));
+
+                        smsLista.add(new ESms(codeAuto, idestado, destinatario_sms, envio_error_sms,
+                                envio_estado_sms, envio_fecha_sms, fecha_registro_sms, id_sms, mensaje_sms));
+                    }
+
+                    //Log.v("Response", smsLista.get(0).getCode());
+
+                    int sms_id = smsLista.get(0).getSms_id();
+                    String code_auto = smsLista.get(0).getCode();
+
+                    mFirestore.collection("data").whereEqualTo("sms_id", sms_id).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                        @Override
+                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                            if (task.isSuccessful()) {
+
+                                for (QueryDocumentSnapshot document : task.getResult()) {
+                                    //Log.d(TAG, document.getId() + " => " + document.getData());
+                                    int idestado = document.getLong("estado_id").intValue();
+                                    String destinatario_sms = (String) document.get("sms_destinatario");
+                                    String envio_error_sms = (String) document.get("sms_envio_error");
+                                    Boolean envio_estado_sms = (Boolean) document.get("sms_envio_estado");
+                                    Timestamp envio_fecha_sms = document.getTimestamp("sms_envio_fecha");
+                                    Timestamp fecha_registro_sms = document.getTimestamp("sms_fecha_registro");
+                                    int id_sms = document.getLong("sms_id").intValue();
+                                    String mensaje_sms = (String) document.get("sms_mensaje");
+
+                                    Log.d(TAG, String.valueOf(id_sms));
+                                }
+                            }
+                        }
+                    });
+
+
+                    upgdateFirebaseData(code_auto);
+
+                }
+            }
+        });
+
+
+    }
+
+    private void upgdateFirebaseData(String code_auto) {
+        mFirestore = FirebaseFirestore.getInstance();
+
+        String enviofecha = "1633105898";
+        Long t = Long.valueOf(enviofecha);
+        Timestamp ts = new Timestamp(t, 0);
+
+        String fecharegistro = "1632934428";
+        Long t2 = Long.valueOf(fecharegistro);
+        Timestamp ts2 = new Timestamp(t2, 0);
+
+        mFirestore.collection("data").document(code_auto)
+                .set(new smsUpdate(
+                        2623, "+51961162845", "oracle data", false,
+                        ts, ts2, 1311998,
+                        "vencimiento diciembre"
+                )).addOnSuccessListener(new OnSuccessListener<Void>() {
+            @Override
+            public void onSuccess(Void aVoid) {
+                Log.d("Firebase", "Se guardo el sms correctamente");
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                Log.d("Firebase", e.toString());
+            }
+        });
+
+    }
+
+    private class smsUpdate {
+        int estado_id;
+        String sms_destinatario;
+        String sms_envio_error;
+        Boolean sms_envio_estado;
+        Timestamp sms_envio_fecha;
+        Timestamp sms_fecha_registro;
+        int sms_id;
+        String sms_mensaje;
+
+        public smsUpdate(int estado_id, String sms_destinatario, String sms_envio_error, Boolean sms_envio_estado, Timestamp sms_envio_fecha, Timestamp sms_fecha_registro, int sms_id, String sms_mensaje) {
+            this.estado_id = estado_id;
+            this.sms_destinatario = sms_destinatario;
+            this.sms_envio_error = sms_envio_error;
+            this.sms_envio_estado = sms_envio_estado;
+            this.sms_envio_fecha = sms_envio_fecha;
+            this.sms_fecha_registro = sms_fecha_registro;
+            this.sms_id = sms_id;
+            this.sms_mensaje = sms_mensaje;
+        }
+
+        public int getEstado_id() {
+            return estado_id;
+        }
+
+        public void setEstado_id(int estado_id) {
+            this.estado_id = estado_id;
+        }
+
+        public String getSms_destinatario() {
+            return sms_destinatario;
+        }
+
+        public void setSms_destinatario(String sms_destinatario) {
+            this.sms_destinatario = sms_destinatario;
+        }
+
+        public String getSms_envio_error() {
+            return sms_envio_error;
+        }
+
+        public void setSms_envio_error(String sms_envio_error) {
+            this.sms_envio_error = sms_envio_error;
+        }
+
+        public Boolean getSms_envio_estado() {
+            return sms_envio_estado;
+        }
+
+        public void setSms_envio_estado(Boolean sms_envio_estado) {
+            this.sms_envio_estado = sms_envio_estado;
+        }
+
+        public Timestamp getSms_envio_fecha() {
+            return sms_envio_fecha;
+        }
+
+        public void setSms_envio_fecha(Timestamp sms_envio_fecha) {
+            this.sms_envio_fecha = sms_envio_fecha;
+        }
+
+        public Timestamp getSms_fecha_registro() {
+            return sms_fecha_registro;
+        }
+
+        public void setSms_fecha_registro(Timestamp sms_fecha_registro) {
+            this.sms_fecha_registro = sms_fecha_registro;
+        }
+
+        public int getSms_id() {
+            return sms_id;
+        }
+
+        public void setSms_id(int sms_id) {
+            this.sms_id = sms_id;
+        }
+
+        public String getSms_mensaje() {
+            return sms_mensaje;
+        }
+
+        public void setSms_mensaje(String sms_mensaje) {
+            this.sms_mensaje = sms_mensaje;
+        }
     }
 }

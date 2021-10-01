@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">msgEnvio</string>
-    <string name="servidor_ruta">http://192.169.218.177</string>
+    <string name="servidor_ruta">https://fichaonline.sacooliveros.edu.pe</string>
 </resources>
