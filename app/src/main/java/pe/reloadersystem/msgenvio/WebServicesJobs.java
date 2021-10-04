@@ -13,6 +13,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -140,7 +141,7 @@ public class WebServicesJobs extends JobService {
     }
 
 
-    private void SendMessage(String code, String sms_numero, String sms_message) {
+    private void SendMessage(String code, String sms_numero, String sms_message, int id_sms) {
 
         try {
 
@@ -153,6 +154,7 @@ public class WebServicesJobs extends JobService {
             sendPIntent.putExtra("sms_numero", sms_numero);
             sendPIntent.putExtra("sms_message", sms_message);
             sendPIntent.putExtra("sms_code", code);
+            sendPIntent.putExtra("sms_codeid", id_sms);
 
 
             PendingIntent sentPI = PendingIntent.getBroadcast(context, requestCode,
@@ -206,7 +208,6 @@ public class WebServicesJobs extends JobService {
         mFirestore.collection("data").whereEqualTo("estado_id", 2623).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
             @Override
             public void onComplete(@NonNull Task<QuerySnapshot> task) {
-
                 if (task.isSuccessful()) {
                     for (QueryDocumentSnapshot document : task.getResult()) {
                         //Log.d(TAG, document.getId() + " => " + document.getData());
@@ -228,21 +229,22 @@ public class WebServicesJobs extends JobService {
 
                     //Log.v("Response", smsLista.get(0).getCode());
 
-                    int datasms_id = smsLista.get(0).getSms_id();
-                    final String code_auto = smsLista.get(0).getCode();
+                    if (smsLista.size() > 0) {
+                        int datasms_id = smsLista.get(0).getSms_id();
+                        final String code_auto = smsLista.get(0).getCode();
 
-                    mFirestore.collection("data").whereEqualTo("sms_id", datasms_id).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                        @Override
-                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                            if (task.isSuccessful()) {
+                        mFirestore.collection("data").whereEqualTo("sms_id", datasms_id).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                            @Override
+                            public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                                if (task.isSuccessful()) {
 
-                                int estado = task.getResult().getDocuments().get(0).getLong("estado_id").intValue();
-                                String envio_error_sms = String.valueOf(task.getResult().getDocuments().get(0).get("sms_envio_error"));
-                                Boolean envio_estado_sms = task.getResult().getDocuments().get(0).getBoolean("sms_envio_estado");
-                                Timestamp envio_fecha_sms = task.getResult().getDocuments().get(0).getTimestamp("sms_envio_fecha");
-                                int id_sms = task.getResult().getDocuments().get(0).getLong("sms_id").intValue();
-                                String mensaje_sms = (String) task.getResult().getDocuments().get(0).get("sms_mensaje");
-                                String destinatario_sms = (String) task.getResult().getDocuments().get(0).get("sms_destinatario");
+                                    int estado = task.getResult().getDocuments().get(0).getLong("estado_id").intValue();
+                                    String envio_error_sms = String.valueOf(task.getResult().getDocuments().get(0).get("sms_envio_error"));
+                                    Boolean envio_estado_sms = task.getResult().getDocuments().get(0).getBoolean("sms_envio_estado");
+                                    Timestamp envio_fecha_sms = task.getResult().getDocuments().get(0).getTimestamp("sms_envio_fecha");
+                                    int id_sms = task.getResult().getDocuments().get(0).getLong("sms_id").intValue();
+                                    String mensaje_sms = (String) task.getResult().getDocuments().get(0).get("sms_mensaje");
+                                    String destinatario_sms = (String) task.getResult().getDocuments().get(0).get("sms_destinatario");
 
 //                                    String envio_error_sms = (String) document.get("sms_envio_error");
 //                                    Boolean envio_estado_sms = (Boolean) document.get("sms_envio_estado");
@@ -251,7 +253,7 @@ public class WebServicesJobs extends JobService {
 //                                    int id_sms = document.getLong("sms_id").intValue();
 //                                    String mensaje_sms = (String) document.get("sms_mensaje");
 
-                                //Log.v("datos", String.valueOf(estado));
+                                    //Log.v("datos", String.valueOf(estado));
 
 //                                for (QueryDocumentSnapshot document : task.getResult()) {
 //                                    //Log.d(TAG, document.getId() + " => " + document.getData());
@@ -266,21 +268,29 @@ public class WebServicesJobs extends JobService {
 //
 //                                   // Log.d(TAG, String.valueOf(id_sms));
 //
-                                    SendMessage(code_auto, destinatario_sms, mensaje_sms);
+                                    SendMessage(code_auto, destinatario_sms, mensaje_sms, id_sms);
 //                                }
+                                }
                             }
-                        }
-                    });
-
-
-                    // upgdateFirebaseData(code_auto);
-
+                        }).addOnFailureListener(new OnFailureListener() {
+                            @Override
+                            public void onFailure(@NonNull Exception e) {
+                                Log.v("Response", e.toString());
+                            }
+                        });
+                    }
+                    else{
+                        //handlerToastMessage(context, "No hay pendientes", 0);
+                        buscaPendientes();
+                    }
                 }
             }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                handlerToastMessage(context, "No hay pendientes", 0);
+                buscaPendientes();
+            }
         });
-
-
     }
-
-
 }

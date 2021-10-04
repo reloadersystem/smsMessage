@@ -18,6 +18,8 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.util.Date;
+
 import androidx.annotation.NonNull;
 import okhttp3.ResponseBody;
 import pe.reloadersystem.msgenvio.servicios.Retrofit.HelperWs;
@@ -34,6 +36,9 @@ public class SmsResultReceiverData extends BroadcastReceiver {
     private static final String EXTRA_NUMBER = "sms_numero";
     private static final String EXTRA_MESSAGE = "sms_message";
     private static final String EXTRA_CODE = "sms_code";
+    private static final String EXTRA_CODEID = "sms_codeid";
+
+
     private static final int ID_SERVICIO = 99;
     private static final String TAG = "SmsResultClass";
     private static final int PERIOD_MS = 5000;
@@ -44,6 +49,7 @@ public class SmsResultReceiverData extends BroadcastReceiver {
         String numero = intent.getStringExtra(EXTRA_NUMBER);
         String mensaje = intent.getStringExtra(EXTRA_MESSAGE);
         String code = intent.getStringExtra(EXTRA_CODE);
+        int sms_codeid = intent.getIntExtra(EXTRA_CODEID, 0);
 
         try {
             switch (getResultCode()) {
@@ -51,27 +57,27 @@ public class SmsResultReceiverData extends BroadcastReceiver {
                     Toast.makeText(context,
                             "Activity.RESULT_OK",
                             Toast.LENGTH_SHORT).show();
-                   updateService(code, "", context, 2621);
+                    updateService(code, "", context, 2621, numero, mensaje, sms_codeid);
                     break;
                 case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
                     Toast.makeText(context, "SMS generic failure", Toast.LENGTH_SHORT)
                             .show();
-                    updateService(code, "ERROR GENERIC FAILURE", context,2622);
+                    updateService(code, "ERROR GENERIC FAILURE", context, 2622, numero, mensaje, sms_codeid);
 
                     break;
                 case SmsManager.RESULT_ERROR_NO_SERVICE:
                     Toast.makeText(context, "SMS no service", Toast.LENGTH_SHORT)
                             .show();
-                    updateService(code, "SMS no service", context,2622);
+                    updateService(code, "SMS no service", context, 2622, numero, mensaje, sms_codeid);
 
                     break;
                 case SmsManager.RESULT_ERROR_NULL_PDU:
                     Toast.makeText(context, "SMS null PDU", Toast.LENGTH_SHORT).show();
-                    updateService(code, "SMS null PDU", context,2622);
+                    updateService(code, "SMS null PDU", context, 2622, numero, mensaje, sms_codeid);
                     break;
                 case SmsManager.RESULT_ERROR_RADIO_OFF:
                     Toast.makeText(context, "SMS radio off", Toast.LENGTH_SHORT).show();
-                    updateService(code, "SMS radio off", context,2622);
+                    updateService(code, "SMS radio off", context, 2622, numero, mensaje, sms_codeid);
                     break;
             }
         } catch (Exception ex) {
@@ -79,10 +85,14 @@ public class SmsResultReceiverData extends BroadcastReceiver {
         }
     }
 
-    private void updateService(String code, String sms_radio_off, final Context context, int estado_id) {
+    private void updateService(String code, String sms_radio_off, final Context context, int estado_id, String destinatario, String mensaje, int smd_id) {
         mFirestore = FirebaseFirestore.getInstance();
 
         Log.v("codigo", code);
+
+        Date date = new Date();
+        Timestamp fecha_hoy = new Timestamp(date);
+        Log.v("hora", fecha_hoy.toString());
 
         String enviofecha = "1633105898";
         Long t = Long.valueOf(enviofecha);
@@ -94,15 +104,15 @@ public class SmsResultReceiverData extends BroadcastReceiver {
 
         mFirestore.collection("data").document(code)
                 .set(new smsUpdate(
-                        estado_id, "+51961162784", sms_radio_off, false,
-                        ts, ts2, 1311998,
-                        "vencimiento 2022"
+                        estado_id, destinatario, sms_radio_off, true,
+                        fecha_hoy, ts2, smd_id,
+                        mensaje
                 )).addOnSuccessListener(new OnSuccessListener<Void>() {
             @Override
             public void onSuccess(Void aVoid) {
                 Log.d("Firebase", "Se guardo el sms correctamente");
-//                cancelJob(context);
-//                reiniciarServicio(context);
+                cancelJob(context);
+                reiniciarServicio(context);
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
@@ -190,11 +200,6 @@ public class SmsResultReceiverData extends BroadcastReceiver {
         } else {
             Log.d(TAG, "Job scheduling failed");
         }
-    }
-
-    private void upgdateFirebaseData(String code_auto) {
-
-
     }
 
     private class smsUpdate {
