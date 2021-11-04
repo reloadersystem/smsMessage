@@ -16,7 +16,7 @@ public class HelperWs {
 
         String domainserver = context.getString(R.string.servidor_ruta);
 
-        String ruta = domainserver + ":8092/FacturacionElectronicaSIIAA/api/v1/estudiante/";
+        String ruta = domainserver + ":8080/FacturacionElectronicaSIIAA/api/v1/estudiante/";
 
         HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
         interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);

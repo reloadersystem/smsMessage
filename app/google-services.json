@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "632183054692",
+    "project_id": "smstrismegisto",
+    "storage_bucket": "smstrismegisto.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:632183054692:android:e362d76dd77d33cadc5a71",
+        "android_client_info": {
+          "package_name": "pe.reloadersystem.msgenvio"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "632183054692-lq001ii2m1dt0e8e5gd61hdhuqev62bi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "pe.reloadersystem.msgenvio",
+            "certificate_hash": "0313bd946df14319cb724b13050f23ced3a6e89c"
+          }
+        },
+        {
+          "client_id": "632183054692-clukf024he68alaic5nfpd2gnts4qogl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD_H4M1zNxSKyO9Ylwn_X285sxLU2N8WL8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "632183054692-clukf024he68alaic5nfpd2gnts4qogl.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
