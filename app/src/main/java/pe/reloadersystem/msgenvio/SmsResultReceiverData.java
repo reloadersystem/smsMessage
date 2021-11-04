@@ -57,7 +57,8 @@ public class SmsResultReceiverData extends BroadcastReceiver {
                     Toast.makeText(context,
                             "Activity.RESULT_OK",
                             Toast.LENGTH_SHORT).show();
-                    updateService(code, "", context, 2621, numero, mensaje, sms_codeid);
+                    saveOnList(code, "", context, 2621, numero, mensaje, sms_codeid);
+                    //updateService(code, "", context, 2621, numero, mensaje, sms_codeid);
                     break;
                 case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
                     Toast.makeText(context, "SMS generic failure", Toast.LENGTH_SHORT)
@@ -83,6 +84,11 @@ public class SmsResultReceiverData extends BroadcastReceiver {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+    }
+
+    private void saveOnList(String code, String s, Context context, int i, String numero, String mensaje, int sms_codeid) {
+
+
     }
 
     private void updateService(String code, String sms_radio_off, final Context context, int estado_id, String destinatario, String mensaje, int smd_id) {

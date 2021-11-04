@@ -8,17 +8,18 @@ public class ESms {
     int estado_id;
     String sms_destinatario;
     String sms_envio_error;
-//    Boolean sms_envio_estado;
+    Boolean sms_envio_estado;
     Timestamp sms_envio_fecha;
     Timestamp sms_fecha_registro;
     int sms_id;
     String sms_mensaje;
 
-    public ESms(String code, int estado_id, String sms_destinatario, String sms_envio_error, Timestamp sms_envio_fecha, Timestamp sms_fecha_registro, int sms_id, String sms_mensaje) {
+    public ESms(String code, int estado_id, String sms_destinatario, String sms_envio_error, Boolean sms_envio_estado, Timestamp sms_envio_fecha, Timestamp sms_fecha_registro, int sms_id, String sms_mensaje) {
         this.code = code;
         this.estado_id = estado_id;
         this.sms_destinatario = sms_destinatario;
         this.sms_envio_error = sms_envio_error;
+        this.sms_envio_estado = sms_envio_estado;
         this.sms_envio_fecha = sms_envio_fecha;
         this.sms_fecha_registro = sms_fecha_registro;
         this.sms_id = sms_id;
@@ -55,6 +56,14 @@ public class ESms {
 
     public void setSms_envio_error(String sms_envio_error) {
         this.sms_envio_error = sms_envio_error;
+    }
+
+    public Boolean getSms_envio_estado() {
+        return sms_envio_estado;
+    }
+
+    public void setSms_envio_estado(Boolean sms_envio_estado) {
+        this.sms_envio_estado = sms_envio_estado;
     }
 
     public Timestamp getSms_envio_fecha() {
